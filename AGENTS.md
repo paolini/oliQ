@@ -31,6 +31,30 @@ This document describes the "Virtual Queue" project and the responsibilities exp
 - Add realtime updates using WebSocket (Next.js) or Redis pub/sub.
 - Provide docker-compose for local dev with MongoDB and Redis, and `.env.example` for secrets.
 
+## Rendering choice: SVG (mobile-first)
+
+- **Decision:** Use SVG for the room map and table rendering.
+- **Rationale:** SVG provides crisp scalable shapes, easy hit-testing for touch, small DOM footprint for 300 simple elements, and straightforward support for rotation/transform for semicircles and custom shapes. It is also easier to style and animate with CSS/SMIL and integrates well with React/Next.js.
+- **When to consider Canvas:** If profiling shows rendering or update bottlenecks on low-end devices (many frequent simultaneous animations or extremely high update rates), we can migrate to Canvas for rasterized drawing.
+
+## Frontend implementation notes (mobile-first)
+
+- Add a `RoomMap` React component that:
+  - Accepts `Table[]` from `/api/tables`.
+  - Maps table `x,y` coordinates into a scalable SVG viewBox and renders each table as an SVG element (square or semicircle) with `transform` for rotation.
+  - Provides touch handlers: `onTap` -> open bottom sheet with table details and actions.
+  - Supports pinch-to-zoom and pan (use a lightweight library or implement gesture handlers with pointer events).
+- Use a bottom sheet component for `Table` details and actions (`raise-hand`, `queue/join`, `in-bathroom`) calling existing API routes.
+- Subscribe to realtime updates via a WebSocket or SSE endpoint that forwards Redis pub/sub events; update local state and re-render affected SVG nodes only.
+- Performance: batch updates, debounce rapid events, and use `requestAnimationFrame` for animated state transitions.
+
+## Next steps
+
+1. Create `components/RoomMap.tsx` rendering SVG and a simple `Table` SVG primitive.
+2. Add client subscription example to the demo page (`pages/index.tsx`) to show realtime updates.
+3. Profile on a mid-range Android device; migrate to Canvas only if necessary.
+
+
 
 ## Developer notes for agents
 - Use Redis for queue semantics and MongoDB for persistent state and history. Keep API surface minimal and well-documented.
