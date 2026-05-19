@@ -4,7 +4,7 @@ export type TableShape = 'square' | 'circle'
 
 export interface Table {
   _id?: ObjectId
-  participant_ids: number[]
+  participant_ids: string[]
   x: number
   y: number
   shape: TableShape

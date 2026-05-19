@@ -2,45 +2,52 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import { getMongoClient } from '../../../../lib/mongo'
 import { ObjectId } from 'mongodb'
 import redis from '../../../../lib/redis'
-import { computeRoomState } from './state'
+import { Event, updateState } from '../../../../lib/models/event'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
-  let roomId: ObjectId | undefined 
+  let room_id: ObjectId | undefined 
   try {
-    roomId = new ObjectId(String(id))
+    room_id = new ObjectId(String(id))
   } catch {
     return res.status(400).json({ error: 'invalid room id' })
   }
 
   if (req.method === 'POST') {
     const body = req.body || {}
-    const { type, participantNumber } = body
-    if (!type) return res.status(400).json({ error: 'type required' })
-    try {
-      const client = await getMongoClient()
-      const db = client.db()
-      await db.collection('events').insertOne({
-        ts: new Date(),
-        event: type,
-        participantNumber,
-        roomId,
-      })
+    if (typeof body.state !== 'string') return res.status(400).json({ error: 'state is required' });
+    const state = body.state as string;
+    if (typeof body.participant !== 'string') return res.status(400).json({ error: 'participant_id is required' });    
+    const participant = body.participant_id as string
+     
+    const client = await getMongoClient()
+    const db = client.db()
+    await db.collection<Event>('events').insertOne({
+        room_id,
+        timestamp: new Date(),
+        state,
+        participant,
+    })
 
-      const state = await computeRoomState(roomId)
-      
-      try {
-        await redis.publish(`state:invalidate:${roomId}`, JSON.stringify({ ts: new Date().toISOString(), roomId, state })) 
-      } catch (e) { 
-        console.error('Redis publish failed', e) 
-      }
-      
-      return res.status(201).json({ ok: true, state })
-    } catch (err:any) {
-      console.error('POST /api/rooms/[id]/events error', err)
-      return res.status(500).json({ error: String(err?.message || err) })
+    try {
+        const state_str = await redis.get(`state:room:${room_id}`);
+
+        async function computeRoomState() {
+            const events = await db.collection<Event>('events').find({ room_id }).toArray()
+            const state = events.reduce(updateState, []);
+            return state;
+        }
+
+        // if state_str is null, it means the state is not cached, so we compute it from the db
+        const state = state_str ? JSON.parse(state_str) : await computeRoomState();
+
+        await redis.publish(`state:room:${room_id}`, JSON.stringify(JSON.stringify(state))) 
+    } catch (e) { 
+        console.error('Redis failed', e) 
     }
-  } else {
-    return res.status(405).json({ error: 'Method not allowed' })
+    
+    return res.status(201).json({ ok: true, state })
   }
+
+  return res.status(405).json({ error: 'Method not allowed' })
 }
