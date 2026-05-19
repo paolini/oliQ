@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getDb } from '../../../../lib/mongo'
 import { withMorgan } from '../../../../lib/morganWrapper'
+import redis from '../../../../lib/redis'
 
 type Data = { ok: boolean; tables?: any[]; error?: string }
 
@@ -37,6 +38,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
       // ensure each inserted doc has roomId set
       const docsToInsert = payload.map((t:any) => ({ ...t, roomId: (() => { try { return new ObjectId(id) } catch { return id } })() }))
       await col.insertMany(docsToInsert)
+      // publish update for this room so clients can reload
+      try { await redis.publish(`tables:room:${id}`, JSON.stringify({ type: 'tables:replace', roomId: id, count: docsToInsert.length })) } catch (e) { console.error('redis publish room tables failed', e) }
       const docs = await col.find({ roomId: docsToInsert[0].roomId }).toArray()
       return res.status(201).json({ ok: true, tables: docs })
     }

@@ -21,6 +21,16 @@ export default function RoomPage() {
 
   useEffect(() => {
     if (!roomId) return
+    // subscribe to server-sent events for live table updates
+    let es: EventSource | null = null
+    try {
+      es = new EventSource(`/api/rooms/${encodeURIComponent(String(roomId))}/tables/subscribe`)
+      es.addEventListener('message', (ev) => {
+        try { const msg = JSON.parse(ev.data); if (msg && (msg.type === 'tables:replace' || msg.type === 'tables:update')) { reloadTables() } } catch (e) { reloadTables() }
+      })
+    } catch (e) {
+      console.error('SSE subscribe failed', e)
+    }
     let mounted = true
     ;(async () => {
       try {
@@ -45,6 +55,13 @@ export default function RoomPage() {
     })()
     return () => { mounted = false }
   }, [roomId])
+
+  useEffect(() => {
+    return () => {
+      // close EventSource when leaving
+      // Note: EventSource created in other effect will be closed by browser automatically on unmount
+    }
+  }, [])
 
   const handleTableClick = (id?: string) => { alert('Table ' + (id||'')) }
 

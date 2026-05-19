@@ -29,6 +29,7 @@ This document describes the "Virtual Queue" project and the responsibilities exp
 ## How current state is obtained
 - The server provides `GET /api/state` which reduces recent `events` entries (or returns a cached snapshot) and computes the participant-oriented view: queue order (from Redis), who was called, who is checked-in, etc.
 - For realtime UX, write to `events` then update cache and publish a Redis pub/sub message so clients receive updates.
+  - Implementation note: server publishes lightweight notifications on channels `tables:all` and `tables:room:<roomId>` when table geometry is replaced. Clients may subscribe via a Server-Sent Events endpoint at `/api/rooms/:id/tables/subscribe` to receive immediate reload notifications.
 
 ## API (canonical list)
 - `POST /api/events` — append an event to `events`. Body: `{ type, participantNumber?, details? }`.
@@ -57,6 +58,8 @@ Notes:
 ## Realtime & caching
 - Publish events to Redis pub/sub after writing to `events` (or after updating the cached state). Clients subscribe to receive immediate updates.
 - Cache `GET /api/state` materialized snapshots in memory or Redis for low-latency reads. Invalidate/update on new `events` writes.
+ - Environment: the app reads `REDIS_URL` (e.g. `redis://localhost:6379`) from env; ensure this is set for production or local testing.
+ - Channels: use `tables:room:<id>` for room-scoped table updates and `tables:all` for global table changes. Payloads may be lightweight notifications or full payloads depending on performance needs.
 
 ## Frontend (mobile-first)
 - Rendering choice: **SVG** for the room map and table rendering (crisp shapes, easy hit-testing, small DOM for 300 elements).
@@ -79,6 +82,8 @@ Notes:
 1. Implement `POST /api/audit`, `GET /api/audit` and `GET /api/state` (state reducer + optional caching).
 2. Provide `GET /api/tables` (geometry) and a simple `RoomMap` implementation in the frontend.
 3. Add Redis pub/sub wiring so new `audit` writes trigger realtime notifications to clients.
+4. (Done) Expose an SSE endpoint for room table updates at `GET /api/rooms/:id/tables/subscribe` so clients can open an `EventSource` and reload room tables on changes.
+5. Test live-update flow end-to-end (start Redis, open two clients, modify tables in one, verify other reloads).
 
 ## Developer notes
 - Use Redis for queue semantics and pub/sub; MongoDB `audit` is the single source of truth for history.

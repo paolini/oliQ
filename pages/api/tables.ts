@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { getDb } from '../../lib/mongo'
 import { Table } from '../../lib/models/table'
 import { withMorgan } from '../../lib/morganWrapper'
+import redis from '../../lib/redis'
 
 type Data = { ok: boolean; tables?: Table[]; error?: string }
 
@@ -49,6 +50,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
       }
 
       await col.insertMany(payload)
+      // publish update to subscribers
+      try { await redis.publish('tables:all', JSON.stringify({ type: 'tables:replace', count: payload.length })) } catch (e) { console.error('redis publish tables:all failed', e) }
       const docs = await col.find().toArray()
       return res.status(201).json({ ok: true, tables: docs })
     }
