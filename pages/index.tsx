@@ -37,7 +37,7 @@ export default function RoomsIndex() {
   const deleteRoom = async (id?: string) => {
     if (!id) return
     if (!confirm('Delete room?')) return
-    const res = await fetch(`/api/rooms?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    const res = await fetch(`/api/rooms/${encodeURIComponent(id)}`, { method: 'DELETE' })
     if (!res.ok) return alert('delete failed')
     setRooms(prev => prev.filter(r => r._id !== id))
   }

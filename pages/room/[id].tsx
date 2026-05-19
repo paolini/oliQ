@@ -173,8 +173,8 @@ export default function RoomPage() {
     // optimistic
     if (typeof w === 'number') setRoomWidth(w)
     if (typeof h === 'number') setRoomHeight(h)
-    try {
-      await fetch(`/api/rooms?id=${encodeURIComponent(String(roomId))}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      try {
+      await fetch(`/api/rooms/${encodeURIComponent(String(roomId))}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     } catch (err) { console.error('saveRoomSize error', err); }
   }
 

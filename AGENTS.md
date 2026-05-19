@@ -18,6 +18,7 @@ This document describes the "Virtual Queue" project and the responsibilities exp
 - `tables` (immutable map geometry)
   - Document shape:
     - { participant_ids: [number], x: number, y: number, shape: 'square'|'circle', rotation?: number, roomId?: ObjectId }
+  - Note: `roomId` is stored as an `ObjectId` when possible; code also accepts a string fallback for convenience.
  - `rooms` (room definitions)
   - Document shape:
     - { title: string, width: number, height: number }
@@ -39,11 +40,15 @@ This document describes the "Virtual Queue" project and the responsibilities exp
 - `GET /api/tables` — return all table geometry documents (for rendering the map).
 - `POST /api/tables` — (tooling only) sets all tables at once (geometry + participant capacity). Not used during runtime, only for initial setup.
  - `GET /api/tables` — return table geometry documents; supports query param `roomId` to filter tables for a room.
- - `POST /api/tables` — (tooling only) sets all tables at once (geometry + participant capacity). When working with multiple rooms, POST should include tables for a single room or include `roomId` per table.
+ - `POST /api/tables` — (tooling only) replace all tables at once (geometry + participant capacity). Useful for global imports/migrations.
  - `GET /api/rooms` — return list of rooms.
  - `POST /api/rooms` — create a new room. Body: `{ title: string, width: number, height: number }`.
  - `PUT /api/rooms/:id` — update room metadata (title/width/height).
- - `DELETE /api/rooms/:id` — delete a room (should consider cascading or reassigning tables).
+   - NOTE: current implementation uses query `PUT /api/rooms?id=<id>`; consider normalizing to route param `/api/rooms/:id` for REST consistency.
+ - `DELETE /api/rooms/:id` — delete a room.
+   - NOTE: current implementation uses query `DELETE /api/rooms?id=<id>`; consider normalizing to route param. Deletion should consider cascading or reassigning tables.
+ - `GET /api/rooms/:id/tables` — return tables for a single room (implemented as `pages/api/rooms/[id]/tables.ts`). Supports RoomId matching by ObjectId or string fallback.
+ - `POST /api/rooms/:id/tables` — (tooling) replace all tables for the specified room only; the server deletes tables with matching `roomId` and inserts provided documents, ensuring inserted docs include `roomId`.
 
 Notes:
 - Avoid duplicating these endpoints in other docs — this is the canonical list.
@@ -59,7 +64,7 @@ Notes:
   - Accept `Table[]` from `/api/tables` and render each as an SVG primitive.
   - Map table `x,y` coordinates into a scalable `viewBox`.
   - Support touch handlers (`tap` -> bottom sheet), pinch-to-zoom and pan.
-  - Allow rectangle selection for grid insertion (tooling mode) and selection-based bulk edits.
+  - Allow rectangle selection for grid insertion (tooling mode) and selection-based bulk edits. `RoomMap` exposes an `editable` boolean prop — when false rectangle selection/drag is disabled (used for view vs edit modes).
 - UI patterns:
   - Bottom sheet for table details and quick actions (raise-hand, join queue, call next).
   - Compact queue view (ordered) and a map view.
