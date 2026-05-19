@@ -21,11 +21,13 @@ export default function TablePrimitive({ _id, participant_ids, x, y, size = 40, 
     style: { cursor: 'pointer' },
   }
 
+  const pidText = (idx = 0) => (Array.isArray(participant_ids) && typeof participant_ids[idx] === 'number' ? String(participant_ids[idx]) : '')
+
   if (shape === 'square') {
     return (
       <g {...commonProps}>
         <rect x={-size / 2} y={-size / 2} width={size} height={size} rx={6} fill={fill} stroke="#333" />
-        <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{_id ? _id.slice(-4) : ''}</text>
+        <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{pidText(0)}</text>
       </g>
     )
   }
@@ -37,7 +39,7 @@ export default function TablePrimitive({ _id, participant_ids, x, y, size = 40, 
     return (
       <g {...commonProps}>
         <path d={d} fill={fill} stroke="#333" />
-        <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{_id ? _id.slice(-4) : ''}</text>
+        <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{pidText(0)}</text>
       </g>
     )
   }
@@ -46,16 +48,18 @@ export default function TablePrimitive({ _id, participant_ids, x, y, size = 40, 
   if (shape === 'circle') {
     const r = size * 0.7
     const seatR = Math.max(4, size * 0.18)
+    // debug log to inspect participant ids
+    // eslint-disable-next-line no-console
+    console.log('TablePrimitive circle', { _id, participant_ids, pid0: pidText(0), pid1: pidText(1) })
     return (
       <g {...commonProps}>
         <circle cx={0} cy={0} r={r} fill={fill} stroke="#333" />
-        <text x={0} y={4} fontSize={12} textAnchor="middle" fill="#fff">{_id ? _id.slice(-4) : ''}</text>
-        {/* left seat */}
-        <circle cx={-r * 0.55} cy={0} r={seatR} fill="#fff" stroke="#333" />
-        <text x={-r * 0.55} y={4} fontSize={8} textAnchor="middle" fill="#333">L</text>
-        {/* right seat */}
-        <circle cx={r * 0.55} cy={0} r={seatR} fill="#fff" stroke="#333" />
-        <text x={r * 0.55} y={4} fontSize={8} textAnchor="middle" fill="#333">R</text>
+        {/* no combined central label; numbers shown left and right */}
+        {/* vertical diameter */}
+        <line x1={0} y1={-r} x2={0} y2={r} stroke="#333" strokeWidth={1} />
+        {/* left and right participant numbers */}
+        <text x={-r * 0.55} y={4} fontSize={10} textAnchor="middle" fill="#fff">{pidText(0)}</text>
+        <text x={r * 0.55} y={4} fontSize={10} textAnchor="middle" fill="#fff">{pidText(1)}</text>
       </g>
     )
   }
@@ -64,7 +68,7 @@ export default function TablePrimitive({ _id, participant_ids, x, y, size = 40, 
   return (
     <g {...commonProps}>
       <rect x={-size / 2} y={-size / 2} width={size} height={size} rx={6} fill={fill} stroke="#333" />
-      <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{_id ? _id.slice(-4) : ''}</text>
+      <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{pidText(0)}</text>
     </g>
   )
 }

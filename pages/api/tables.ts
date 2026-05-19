@@ -31,11 +31,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
         return res.status(400).json({ ok: false, error: 'expected an array of tables' })
       }
 
-      // basic validation
-      const valid = payload.every((t) => typeof t.x === 'number' && typeof t.y === 'number' && (t.shape === 'square' || t.shape === 'circle') && Array.isArray(t.participant_ids))
-      if (!valid) return res.status(400).json({ ok: false, error: 'invalid table format' })
+      // Validate payload first
+      if (payload.length > 0) {
+        const valid = payload.every((t) => typeof t.x === 'number' && typeof t.y === 'number' && (t.shape === 'square' || t.shape === 'circle') && Array.isArray(t.participant_ids))
+        if (!valid) return res.status(400).json({ ok: false, error: 'invalid table format' })
+      }
 
+      // Now replace collection: delete all then optionally insert new
       await col.deleteMany({})
+      if (payload.length === 0) {
+        return res.status(201).json({ ok: true, tables: [] })
+      }
+
       await col.insertMany(payload)
       const docs = await col.find().toArray()
       return res.status(201).json({ ok: true, tables: docs })

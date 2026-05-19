@@ -120,19 +120,62 @@ export default function Home() {
 
   const clearSelection = () => setSelectedIds([])
 
-  const changeShapeForSelection = async (shape: string) => {
+  
+
+  const deleteSelectedTables = async () => {
     if (selectedIds.length === 0) return
-    const updates = tables.filter(t => selectedIds.includes(t.id)).map(t => ({ ...t, shape }))
-    // optimistic
-    setTables(prev => prev.map(t => selectedIds.includes(t.id) ? { ...t, shape } : t))
+    if (!confirm(`Delete ${selectedIds.length} selected table(s)?`)) return
+
+    // optimistic update
+    setTables(prev => prev.filter(t => !selectedIds.includes(t.id)))
     try {
-      const res = await fetch('/api/tables/upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tables: updates }) })
+      // persist remaining tables via tooling endpoint POST /api/tables (replace all)
+      const remaining = tables.filter(t => !selectedIds.includes(t.id))
+      const payload = remaining.map(t => ({ participant_ids: t.participant_ids || [], x: t.x, y: t.y, shape: t.shape, rotation: t.rotation }))
+      const res = await fetch('/api/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (!res.ok) {
-        const txt = await res.text().catch(() => 'upsert failed')
+        const txt = await res.text().catch(() => 'delete failed')
         throw new Error(txt)
       }
     } catch (err: any) {
-      console.error('bulk upsert failed', err)
+      console.error('failed to persist delete', err)
+      setError(err?.message || String(err))
+    }
+    clearSelection()
+  }
+
+  const renumberSelectedTables = async (start: number) => {
+    if (selectedIds.length === 0) return
+
+    // compute ordering: top-to-bottom rows, left-to-right within each row
+    const selectedTables = tables.filter(t => selectedIds.includes(t.id))
+    selectedTables.sort((a, b) => {
+      if (a.y === b.y) return (a.x || 0) - (b.x || 0)
+      return (a.y || 0) - (b.y || 0)
+    })
+
+    let next = start
+    const updates: any[] = []
+    const newTables = tables.map(t => {
+      if (!selectedIds.includes(t.id)) return t
+      const isCircle = t.shape === 'circle'
+      const ids = isCircle ? [next, next + 1] : [next]
+      next += ids.length
+      updates.push({ ...t, participant_ids: ids })
+      return { ...t, participant_ids: ids }
+    })
+
+    // optimistic update
+    setTables(newTables)
+    try {
+      const payload = newTables.map(t => ({ participant_ids: t.participant_ids || [], x: t.x, y: t.y, shape: t.shape, rotation: t.rotation }))
+      const res = await fetch('/api/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (!res.ok) {
+        const txt = await res.text().catch(() => 'renumber failed')
+        throw new Error(txt)
+      }
+    } catch (err: any) {
+      console.error('failed to persist renumber', err)
       setError(err?.message || String(err))
     }
     clearSelection()
@@ -189,9 +232,14 @@ export default function Home() {
           {selectedIds.length > 0 && (
             <div style={{ padding: 8, background: '#fff8e1', display: 'flex', gap: 8, alignItems: 'center' }}>
               <div>{selectedIds.length} selected</div>
-              <button onClick={() => changeShapeForSelection('square')}>Square</button>
-              <button onClick={() => changeShapeForSelection('semicircle-left')}>Semicircle L</button>
-              <button onClick={() => changeShapeForSelection('semicircle-right')}>Semicircle R</button>
+              <button onClick={deleteSelectedTables} style={{ color: '#b71c1c' }}>Delete</button>
+              <button onClick={async () => {
+                const startStr = prompt('Numero del primo posto (intero)?')
+                if (!startStr) return
+                const start = Number(startStr)
+                if (!Number.isInteger(start)) return alert('Inserire un numero intero valido')
+                await renumberSelectedTables(start)
+              }}>Renumber</button>
               <button onClick={clearSelection}>Clear</button>
             </div>
           )}
