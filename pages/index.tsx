@@ -52,13 +52,13 @@ export default function RoomsIndex() {
       </div>
       <ul>
         {rooms.map(r => (
-          <li key={r._id} style={{ marginBottom: 8 }}>
-            <strong>{r.title}</strong> — {r.width}x{r.height}
-            <span style={{ marginLeft: 12 }}>
-              <Link href={`/room?id=${r._id}`}>Open</Link>
-            </span>
-            <button style={{ marginLeft: 8 }} onClick={() => deleteRoom(r._id)}>Delete</button>
-          </li>
+              <li key={r._id} style={{ marginBottom: 8 }}>
+                <strong>{r.title}</strong> — {r.width}x{r.height}
+                <span style={{ marginLeft: 12 }}>
+                  <Link href={`/room/${r._id}`}>Open</Link>
+                </span>
+                <button style={{ marginLeft: 8 }} onClick={() => deleteRoom(r._id)}>Delete</button>
+              </li>
         ))}
       </ul>
       </div>

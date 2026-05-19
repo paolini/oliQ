@@ -22,9 +22,10 @@ type Props = {
   selectionRect?: { x1: number, y1: number, x2: number, y2: number } | null
   roomWidth?: number
   roomHeight?: number
+  editable?: boolean
 }
 
-export default function RoomMap({ tables, width = 360, height = 640, onTableClick, onSelectionComplete, selectionRect: externalRect, roomWidth, roomHeight }: Props) {
+export default function RoomMap({ tables, width = 360, height = 640, onTableClick, onSelectionComplete, selectionRect: externalRect, roomWidth, roomHeight, editable = true }: Props) {
   const padding = 20
   const [selecting, setSelecting] = useState(false)
   const [rect, setRect] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null)
@@ -59,6 +60,7 @@ export default function RoomMap({ tables, width = 360, height = 640, onTableClic
   }
 
   const onPointerDown = (e: React.PointerEvent) => {
+    if (!editable) return
     if (!svgRef.current) return
     (e.target as Element).setPointerCapture(e.pointerId)
     const start = clientToSvg(e.clientX, e.clientY)
@@ -67,12 +69,14 @@ export default function RoomMap({ tables, width = 360, height = 640, onTableClic
   }
 
   const onPointerMove = (e: React.PointerEvent) => {
+    if (!editable) return
     if (!selecting || !rect) return
     const p = clientToSvg(e.clientX, e.clientY)
     setRect({ ...rect, x2: p.x, y2: p.y })
   }
 
     const onPointerUp = (e: React.PointerEvent) => {
+      if (!editable) return
       if (!selecting || !rect) return
       setSelecting(false)
       setRect(rect)
