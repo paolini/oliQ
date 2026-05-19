@@ -20,7 +20,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
 
   try {
     if (req.method === 'GET') {
-      const docs = await col.find().toArray()
+      const { roomId } = req.query
+      const q: any = {}
+      if (roomId && typeof roomId === 'string') {
+        try { q.roomId = { $eq: new ObjectId(roomId) } } catch { q.roomId = roomId }
+      }
+      const docs = await col.find(q).toArray()
       return res.status(200).json({ ok: true, tables: docs })
     }
 

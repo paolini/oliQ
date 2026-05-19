@@ -5,11 +5,12 @@ export type ParticipantStatus = 'idle' | 'hand' | 'waiting' | 'toilet1' | 'toile
 
 export interface Table {
   _id?: ObjectId
-  participant_ids: [number]
+  participant_ids: number[]
   x: number
   y: number
   shape: TableShape
   rotation?: number
+  roomId?: ObjectId
 }
 
 export interface Participant {

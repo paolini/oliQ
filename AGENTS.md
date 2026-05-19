@@ -17,7 +17,10 @@ This document describes the "Virtual Queue" project and the responsibilities exp
 ## Database model
 - `tables` (immutable map geometry)
   - Document shape:
-    - { participant_ids: [number], x: number, y: number, shape: 'square'|'circle', rotation?: number }
+    - { participant_ids: [number], x: number, y: number, shape: 'square'|'circle', rotation?: number, roomId?: ObjectId }
+ - `rooms` (room definitions)
+  - Document shape:
+    - { title: string, width: number, height: number }
  - `events` (append-only event log — source of truth for participant activity)
   - Document shape:
     - { ts: Date, event: 'raise-hand'|'join-queue'|'bathroom-1'|'bathroom-2'|'seat', participantNumber: number, }
@@ -35,6 +38,12 @@ This document describes the "Virtual Queue" project and the responsibilities exp
 - `GET /api/queue/status` — return queue snapshot (ordered list + ETA estimate). Source of order: Redis.
 - `GET /api/tables` — return all table geometry documents (for rendering the map).
 - `POST /api/tables` — (tooling only) sets all tables at once (geometry + participant capacity). Not used during runtime, only for initial setup.
+ - `GET /api/tables` — return table geometry documents; supports query param `roomId` to filter tables for a room.
+ - `POST /api/tables` — (tooling only) sets all tables at once (geometry + participant capacity). When working with multiple rooms, POST should include tables for a single room or include `roomId` per table.
+ - `GET /api/rooms` — return list of rooms.
+ - `POST /api/rooms` — create a new room. Body: `{ title: string, width: number, height: number }`.
+ - `PUT /api/rooms/:id` — update room metadata (title/width/height).
+ - `DELETE /api/rooms/:id` — delete a room (should consider cascading or reassigning tables).
 
 Notes:
 - Avoid duplicating these endpoints in other docs — this is the canonical list.

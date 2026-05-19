@@ -50,7 +50,6 @@ export default function TablePrimitive({ _id, participant_ids, x, y, size = 40, 
     const seatR = Math.max(4, size * 0.18)
     // debug log to inspect participant ids
     // eslint-disable-next-line no-console
-    console.log('TablePrimitive circle', { _id, participant_ids, pid0: pidText(0), pid1: pidText(1) })
     return (
       <g {...commonProps}>
         <circle cx={0} cy={0} r={r} fill={fill} stroke="#333" />

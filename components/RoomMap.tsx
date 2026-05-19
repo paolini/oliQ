@@ -19,11 +19,12 @@ type Props = {
   enableGridInsert?: boolean
   onCreateTables?: (tables: Table[]) => void
   onSelectionComplete?: (rect: { x1: number, y1: number, x2: number, y2: number }) => void
+  selectionRect?: { x1: number, y1: number, x2: number, y2: number } | null
   roomWidth?: number
   roomHeight?: number
 }
 
-export default function RoomMap({ tables, width = 360, height = 640, onTableClick, onSelectionComplete, roomWidth, roomHeight }: Props) {
+export default function RoomMap({ tables, width = 360, height = 640, onTableClick, onSelectionComplete, selectionRect: externalRect, roomWidth, roomHeight }: Props) {
   const padding = 20
   const [selecting, setSelecting] = useState(false)
   const [rect, setRect] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null)
@@ -77,6 +78,14 @@ export default function RoomMap({ tables, width = 360, height = 640, onTableClic
       setRect(rect)
       if (onSelectionComplete) onSelectionComplete({ x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 })
   }
+
+    // sync external selectionRect prop if provided (clear or set)
+    React.useEffect(() => {
+      if (typeof externalRect === 'undefined') return
+      setRect(externalRect || null)
+      // when externalRect becomes non-null we set selecting=false so that pointer interactions restart
+      if (!externalRect) setSelecting(false)
+    }, [externalRect])
 
   const renderSelectionRect = () => {
     if (!rect) return null
