@@ -14,7 +14,7 @@ export default function RoomPage() {
   const [roomTitle, setRoomTitle] = useState<string>('')
   const [roomWidth, setRoomWidth] = useState<number | undefined>(800)
   const [roomHeight, setRoomHeight] = useState<number | undefined>(600)
-  const [editMode, setEditMode] = useState<boolean>(false)
+  const editMode = Boolean(router.query && router.query.edit)
   const [gridAction, setGridAction] = useState<'add' | 'square' | 'circle'>('add')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [selectionRect, setSelectionRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
@@ -26,7 +26,13 @@ export default function RoomPage() {
     try {
       es = new EventSource(`/api/rooms/${encodeURIComponent(String(roomId))}/tables/subscribe`)
       es.addEventListener('message', (ev) => {
-        try { const msg = JSON.parse(ev.data); if (msg && (msg.type === 'tables:replace' || msg.type === 'tables:update')) { reloadTables() } } catch (e) { reloadTables() }
+        try { 
+          const msg = JSON.parse(ev.data); 
+          if (msg && (msg.type === 'tables:replace' || msg.type === 'tables:update')) { 
+            reloadTables() } 
+        } catch (e) { 
+            reloadTables() 
+        }
       })
     } catch (e) {
       console.error('SSE subscribe failed', e)
@@ -203,12 +209,12 @@ export default function RoomPage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <h1 style={{ margin: 0 }}>Room: {roomTitle || roomId}</h1>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {editMode ? (
+            <button onClick={() => router.push(`/room/${roomId}`)}>Switch to view mode</button>
+          ) : (
+            <button onClick={() => router.push(`/room/${roomId}?edit=1`)}>Switch to edit mode</button>
+          )}
           <div style={{ fontSize: 13 }}>{editMode ? 'Edit mode' : 'View mode'}</div>
-          <label style={{ position: 'relative', width: 48, height: 28, display: 'inline-block', cursor: 'pointer' }}>
-            <input aria-label="edit-mode" type="checkbox" checked={editMode} onChange={e => setEditMode(e.target.checked)} style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', margin: 0, cursor: 'pointer' }} />
-            <div style={{ position: 'absolute', inset: 0, background: editMode ? '#e53935' : '#ccc', borderRadius: 999, transition: 'background 150ms', pointerEvents: 'none' }} />
-            <div style={{ position: 'absolute', top: 3, left: editMode ? 26 : 3, width: 22, height: 22, background: '#fff', borderRadius: 999, boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 150ms', pointerEvents: 'none' }} />
-          </label>
         </div>
       </div>
 

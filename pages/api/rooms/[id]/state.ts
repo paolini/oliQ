@@ -1,22 +1,17 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { getDb } from '../../../../lib/mongo'
 import redis from '../../../../lib/redis'
+import { ObjectId } from 'bson'
 
-type ComputeOpts = {
-  roomId?: string
-  maxEvents?: number
-}
-
-async function computeRoomState(opts: ComputeOpts = {}) {
-  const { roomId, maxEvents = 2000 } = opts
+export async function computeRoomState(roomId: ObjectId) {
   const db = await getDb()
 
   const q: any = {}
   if (roomId) q.roomId = String(roomId)
 
-  const events = await db.collection('events').find(q).sort({ ts: -1 }).limit(maxEvents).toArray()
+  const events = await db.collection('events').find({roomId}).sort({ ts: -1 }).toArray()
 
-  // reduce per participant: lastEvent, status, lastSeen
+  // riduce per participant: lastEvent, status, lastSeen
   const participants: Record<number, any> = {}
   for (const ev of events) {
     const pn = typeof ev.participantNumber === 'number' ? ev.participantNumber : undefined
@@ -41,9 +36,9 @@ async function computeRoomState(opts: ComputeOpts = {}) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query
-  const roomId = Array.isArray(id) ? id[0] : id
   try {
-    const state = await computeRoomState({ roomId })
+    const roomId = new ObjectId(String(id))
+    const state = await computeRoomState(roomId)
     return res.status(200).json({ ok: true, state })
   } catch (err:any) {
     console.error('GET /api/rooms/[id]/state error', err)

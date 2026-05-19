@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 
 export default function RoomsIndex() {
+  const router = useRouter()
   const [rooms, setRooms] = useState<Array<{ _id?: string, title: string, width: number, height: number }>>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -24,10 +26,7 @@ export default function RoomsIndex() {
   const createRoom = async () => {
     const title = prompt('Room title?')
     if (!title) return
-    const wStr = prompt('Width? (number)')
-    const hStr = prompt('Height? (number)')
-    const w = Number(wStr); const h = Number(hStr)
-    if (!w || !h) return alert('Invalid size')
+    const w = 600; const h = 800;
     const res = await fetch('/api/rooms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, width: w, height: h }) })
     if (!res.ok) return alert('failed')
     const jd = await res.json()
@@ -53,11 +52,11 @@ export default function RoomsIndex() {
       <ul>
         {rooms.map(r => (
               <li key={r._id} style={{ marginBottom: 8 }}>
-                <strong>{r.title}</strong> — {r.width}x{r.height}
-                <span style={{ marginLeft: 12 }}>
-                  <Link href={`/room/${r._id}`}>Open</Link>
-                </span>
-                <button style={{ marginLeft: 8 }} onClick={() => deleteRoom(r._id)}>Delete</button>
+                  <Link href={`/room/${r._id}`}>
+                    <strong>{r.title}</strong> — {r.width}x{r.height}
+                  </Link>
+                <button style={{ marginLeft: 8 }} onClick={() => router.push(`/room/${r._id}?edit=1`)}>edit</button>
+                <button style={{ marginLeft: 8 }} onClick={() => confirm('Delete room?') && deleteRoom(r._id)}>Delete</button>
               </li>
         ))}
       </ul>
