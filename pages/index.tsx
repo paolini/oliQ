@@ -2,28 +2,21 @@ import React, { useEffect, useState } from 'react'
 import RoomMap from '../components/RoomMap'
 
 type Table = {
-  id: number
+  _id?: string
+  participant_ids?: number[]
   x: number
   y: number
-  shape?: string
-  status?: string
+  shape?: 'square' | 'circle'
+  rotation?: number
 }
 
 export default function Home() {
   const [tables, setTables] = useState<Table[]>([])
   const [queue, setQueue] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetch('/api/queue/status')
-      .then((r) => r.json())
-      .then((data) => {
-        setQueue(data.queue || [])
-        setTables(data.tables || [])
-      })
-  }, [])
-
-  const handleTableClick = (id: number) => {
-    alert('Table ' + id)
+  const handleTableClick = (id?: string) => {
+    alert('Table ' + (id || ''))
   }
 
   const [gridMode, setGridMode] = useState(false)
@@ -31,6 +24,37 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [roomWidth, setRoomWidth] = useState<number | undefined>(800)
   const [roomHeight, setRoomHeight] = useState<number | undefined>(600)
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const res = await fetch('/api/tables')
+        if (!res.ok) {
+          const txt = await res.text().catch(() => 'failed to load')
+          setError(`Failed to load tables: ${txt}`)
+          return
+        }
+        const data = await res.json()
+        if (!mounted) return
+        setError(null)
+        const docs = data.tables || []
+        const mapped: Table[] = docs.map((t: any, i: number) => ({
+          _id: t._id ? String(t._id) : undefined,
+          participant_ids: Array.isArray(t.participant_ids) ? t.participant_ids.map(Number) : [],
+          x: Number(t.x) || 0,
+          y: Number(t.y) || 0,
+          shape: t.shape === 'circle' ? 'circle' : 'square',
+          rotation: typeof t.rotation === 'number' ? t.rotation : undefined,
+        }))
+        setTables(mapped)
+      } catch (err: any) {
+        console.error('failed to load tables', err)
+        setError(err?.message || String(err))
+      }
+    })()
+    return () => { mounted = false }
+  }, [])
 
   const selectTablesInRect = (rect: { x1: number; y1: number; x2: number; y2: number }) => {
     const x = Math.min(rect.x1, rect.x2)
@@ -76,13 +100,18 @@ export default function Home() {
     // optimistic update
     setTables(prev => [...prev, ...newTables])
 
-    // persist each table via API (upsert via /api/tables/[id]/state)
-    for (const t of newTables) {
-      try {
-        await fetch(`/api/tables/${t.id}/state`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'normal' }) })
-      } catch (err) {
-        console.error('failed to create table', t.id, err)
+    // persist new tables via tooling endpoint POST /api/tables (replace all)
+    try {
+      // send combined list: existing tables + newTables mapped to mongo shape
+      const payload = [...tables, ...newTables].map(t => ({ participant_ids: t.participant_ids || [], x: t.x, y: t.y, shape: t.shape, rotation: t.rotation }))
+      const res = await fetch('/api/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (!res.ok) {
+        const txt = await res.text().catch(() => 'upsert failed')
+        throw new Error(txt)
       }
+    } catch (err: any) {
+      console.error('failed to persist new tables', err)
+      setError(err?.message || String(err))
     }
 
     setGridMode(false)
@@ -97,9 +126,14 @@ export default function Home() {
     // optimistic
     setTables(prev => prev.map(t => selectedIds.includes(t.id) ? { ...t, shape } : t))
     try {
-      await fetch('/api/tables/upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tables: updates }) })
-    } catch (err) {
+      const res = await fetch('/api/tables/upsert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tables: updates }) })
+      if (!res.ok) {
+        const txt = await res.text().catch(() => 'upsert failed')
+        throw new Error(txt)
+      }
+    } catch (err: any) {
       console.error('bulk upsert failed', err)
+      setError(err?.message || String(err))
     }
     clearSelection()
   }
@@ -162,6 +196,11 @@ export default function Home() {
             </div>
           )}
           <div style={{ width: roomWidth || 360, height: roomHeight || 640 }}>
+            {error && (
+              <div style={{ padding: 8, background: '#ffebee', color: '#b71c1c', borderRadius: 6, marginBottom: 8 }}>
+                {error}
+              </div>
+            )}
             <RoomMap tables={tables.slice(0, 300) as any} width={roomWidth || 360} height={roomHeight || 640} onTableClick={handleTableClick} onSelectionComplete={handleSelectionComplete} roomWidth={roomWidth} roomHeight={roomHeight} />
           </div>
         </div>

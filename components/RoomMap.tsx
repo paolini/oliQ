@@ -2,10 +2,11 @@ import React, { useMemo, useState, useRef } from 'react'
 import TablePrimitive from './TablePrimitive'
 
 type Table = {
-  id: number
+  _id?: string
+  participant_ids?: number[]
   x: number
   y: number
-  shape?: 'square' | 'semicircle-left' | 'semicircle-right'
+  shape?: 'square' | 'semicircle-left' | 'semicircle-right' | 'circle'
   rotation?: number
   status?: string
 }
@@ -39,8 +40,8 @@ export default function RoomMap({ tables, width = 360, height = 640, onTableClic
     ? `0 0 ${roomWidth} ${roomHeight}`
     : `${bounds.minX - padding} ${bounds.minY - padding} ${bounds.maxX - bounds.minX + padding * 2} ${bounds.maxY - bounds.minY + padding * 2}`
 
-  const handleClick = (id: number) => {
-    if (onTableClick) onTableClick(id)
+  const handleClick = (id?: string) => {
+    if (onTableClick && id) onTableClick(id)
   }
 
   const clientToSvg = (clientX: number, clientY: number) => {
@@ -91,7 +92,7 @@ export default function RoomMap({ tables, width = 360, height = 640, onTableClic
       <svg ref={svgRef} width="100%" height="100%" viewBox={viewBox} preserveAspectRatio="none" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
         <rect x={0} y={0} width={roomWidth || (bounds.maxX - bounds.minX + padding * 2)} height={roomHeight || (bounds.maxY - bounds.minY + padding * 2)} fill="#fafafa" />
         {tables.map(t => (
-          <TablePrimitive key={t.id} id={t.id} x={t.x} y={t.y} shape={t.shape || 'square'} rotation={t.rotation || 0} status={t.status} onClick={handleClick} />
+          <TablePrimitive key={t._id || `${t.x}-${t.y}`} _id={t._id} participant_ids={t.participant_ids} x={t.x} y={t.y} shape={t.shape || 'square'} rotation={t.rotation || 0} status={t.status} onClick={handleClick} />
         ))}
         {renderSelectionRect()}
       </svg>

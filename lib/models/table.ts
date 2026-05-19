@@ -1,15 +1,19 @@
 import { ObjectId } from 'mongodb'
 
-export type TableShape = 'square' | 'semicircle-left' | 'semicircle-right'
-export type TableStatus = 'normal' | 'raised-hand' | 'queued' | 'in-bathroom'
+export type TableShape = 'square' | 'circle'
+export type ParticipantStatus = 'idle' | 'hand' | 'waiting' | 'toilet1' | 'toilet2'
 
 export interface Table {
   _id?: ObjectId
-  id: number
+  participant_ids: [number]
   x: number
   y: number
   shape: TableShape
   rotation?: number
-  status: TableStatus
-  lastStatusChange?: Date
+}
+
+export interface Participant {
+  _id?: ObjectId
+  name: string
+  color: string
 }

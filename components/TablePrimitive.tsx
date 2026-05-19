@@ -1,22 +1,23 @@
 import React from 'react'
 
 type Props = {
-  id: number
+  _id?: string
+  participant_ids?: number[]
   x: number
   y: number
   size?: number
   shape?: 'square' | 'semicircle-left' | 'semicircle-right' | 'circle'
   rotation?: number
   status?: string
-  onClick?: (id: number) => void
+  onClick?: (id?: string) => void
 }
 
-export default function TablePrimitive({ id, x, y, size = 40, shape = 'square', rotation = 0, status, onClick }: Props) {
+export default function TablePrimitive({ _id, participant_ids, x, y, size = 40, shape = 'square', rotation = 0, status, onClick }: Props) {
   const fill = status === 'in-bathroom' ? '#f44336' : status === 'raised-hand' ? '#ff9800' : status === 'queued' ? '#2196f3' : '#8bc34a'
 
   const commonProps = {
     transform: `translate(${x}, ${y}) rotate(${rotation})`,
-    onClick: () => onClick && onClick(id),
+    onClick: () => onClick && onClick(_id),
     style: { cursor: 'pointer' },
   }
 
@@ -24,7 +25,7 @@ export default function TablePrimitive({ id, x, y, size = 40, shape = 'square', 
     return (
       <g {...commonProps}>
         <rect x={-size / 2} y={-size / 2} width={size} height={size} rx={6} fill={fill} stroke="#333" />
-        <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{id}</text>
+        <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{_id ? _id.slice(-4) : ''}</text>
       </g>
     )
   }
@@ -36,7 +37,7 @@ export default function TablePrimitive({ id, x, y, size = 40, shape = 'square', 
     return (
       <g {...commonProps}>
         <path d={d} fill={fill} stroke="#333" />
-        <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{id}</text>
+        <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{_id ? _id.slice(-4) : ''}</text>
       </g>
     )
   }
@@ -48,7 +49,7 @@ export default function TablePrimitive({ id, x, y, size = 40, shape = 'square', 
     return (
       <g {...commonProps}>
         <circle cx={0} cy={0} r={r} fill={fill} stroke="#333" />
-        <text x={0} y={4} fontSize={12} textAnchor="middle" fill="#fff">{id}</text>
+        <text x={0} y={4} fontSize={12} textAnchor="middle" fill="#fff">{_id ? _id.slice(-4) : ''}</text>
         {/* left seat */}
         <circle cx={-r * 0.55} cy={0} r={seatR} fill="#fff" stroke="#333" />
         <text x={-r * 0.55} y={4} fontSize={8} textAnchor="middle" fill="#333">L</text>
@@ -63,7 +64,7 @@ export default function TablePrimitive({ id, x, y, size = 40, shape = 'square', 
   return (
     <g {...commonProps}>
       <rect x={-size / 2} y={-size / 2} width={size} height={size} rx={6} fill={fill} stroke="#333" />
-      <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{id}</text>
+      <text x={0} y={4} fontSize={10} textAnchor="middle" fill="#fff">{_id ? _id.slice(-4) : ''}</text>
     </g>
   )
 }

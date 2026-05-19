@@ -9,13 +9,15 @@ This document describes the "Virtual Queue" project and the responsibilities exp
 
 ## Key design principles
 - Tables are immutable geometry documents: created at setup and not changed during the contest (position/shape fixed).
+- Tables come in two shapes: squares (1 participant) and circles (2 participants). The `tables` collection defines the geometry and participant capacity.
 - All runtime activity is recorded in a single append-only `events` collection. The `events` collection contains participant-oriented events only — it must not reference tables or seats.
 - State for the UI (who is queued, called, checked-in) is derived by reducing the `events` log; for responsiveness the server may cache a materialized `state` view, but the `events` collection is authoritative.
+
 
 ## Database model
 - `tables` (immutable map geometry)
   - Document shape:
-    - { id: number, x: number, y: number, shape: 'square'|'circle', rotation?: number }
+    - { participant_ids: [number], x: number, y: number, shape: 'square'|'circle', rotation?: number }
  - `events` (append-only event log — source of truth for participant activity)
   - Document shape:
     - { ts: Date, event: 'raise-hand'|'join-queue'|'bathroom-1'|'bathroom-2'|'seat', participantNumber: number, }
@@ -32,6 +34,7 @@ This document describes the "Virtual Queue" project and the responsibilities exp
  - `POST /api/queue/leave` — remove participant from Redis queue and append an `events` record.
 - `GET /api/queue/status` — return queue snapshot (ordered list + ETA estimate). Source of order: Redis.
 - `GET /api/tables` — return all table geometry documents (for rendering the map).
+- `POST /api/tables` — (tooling only) sets all tables at once (geometry + participant capacity). Not used during runtime, only for initial setup.
 
 Notes:
 - Avoid duplicating these endpoints in other docs — this is the canonical list.
