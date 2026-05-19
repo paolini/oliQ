@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getDb } from '../../../../lib/mongo'
+import { ObjectId } from 'mongodb'
 import { withMorgan } from '../../../../lib/morganWrapper'
 import redis from '../../../../lib/redis'
 
@@ -18,7 +19,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
     if (req.method === 'GET') {
       const q: any = {}
       try { q.roomId = { $eq: new ObjectId(id) } } catch { q.roomId = id }
+      console.log('GET /api/rooms/[id]/tables - query:', JSON.stringify(q))
       const docs = await col.find(q).toArray()
+      console.log('GET /api/rooms/[id]/tables - found', docs.length, 'tables')
       return res.status(200).json({ ok: true, tables: docs })
     }
 
@@ -35,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
 
       if (payload.length === 0) return res.status(201).json({ ok: true, tables: [] })
 
-      // ensure each inserted doc has roomId set
+      // ensure each inserted doc has roomId set as ObjectId when possible
       const docsToInsert = payload.map((t:any) => ({ ...t, roomId: (() => { try { return new ObjectId(id) } catch { return id } })() }))
       await col.insertMany(docsToInsert)
       // publish update for this room so clients can reload

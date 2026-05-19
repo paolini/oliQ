@@ -27,21 +27,19 @@ This document describes the "Virtual Queue" project and the responsibilities exp
     - { ts: Date, event: 'raise-hand'|'join-queue'|'bathroom-1'|'bathroom-2'|'seat', participantNumber: number, }
 
 ## How current state is obtained
-- The server provides `GET /api/state` which reduces recent `events` entries (or returns a cached snapshot) and computes the participant-oriented view: queue order (from Redis), who was called, who is checked-in, etc.
+- The server provides `GET /api/rooms/:id/state` which reduces recent `events` entries (or returns a cached snapshot) and computes the participant-oriented view: queue order (from Redis), who was called, who is checked-in, etc.
 - For realtime UX, write to `events` then update cache and publish a Redis pub/sub message so clients receive updates.
   - Implementation note: server publishes lightweight notifications on channels `tables:all` and `tables:room:<roomId>` when table geometry is replaced. Clients may subscribe via a Server-Sent Events endpoint at `/api/rooms/:id/tables/subscribe` to receive immediate reload notifications.
 
 ## API (canonical list)
-- `POST /api/events` — append an event to `events`. Body: `{ type, participantNumber?, details? }`.
-- `GET /api/events` — query the events log (filters: participantNumber, type, since/until).
-- `GET /api/state` — return computed state (optionally cached). Supports filters for participant or time window.
+- `POST /api/rooms/:id/events` — append an event to `events` scoped to a room. Body: `{ type, participantNumber?, details? }`.
+- `GET /api/rooms/:id/events` — query the events log for a room (filters: participantNumber, type, since/until).
+- `GET /api/rooms/:id/state` — return computed state for a room (optionally cached). Supports filters for participant or time window.
  - `POST /api/queue/join` — push participant into Redis queue and append an `events` record.
  - `POST /api/queue/leave` — remove participant from Redis queue and append an `events` record.
 - `GET /api/queue/status` — return queue snapshot (ordered list + ETA estimate). Source of order: Redis.
-- `GET /api/tables` — return all table geometry documents (for rendering the map).
-- `POST /api/tables` — (tooling only) sets all tables at once (geometry + participant capacity). Not used during runtime, only for initial setup.
- - `GET /api/tables` — return table geometry documents; supports query param `roomId` to filter tables for a room.
- - `POST /api/tables` — (tooling only) replace all tables at once (geometry + participant capacity). Useful for global imports/migrations.
+- `GET /api/rooms/:id/tables` — return table geometry documents for a room (implemented as `pages/api/rooms/[id]/tables.ts`).
+- `POST /api/rooms/:id/tables` — (tooling only) replace all tables for the specified room only; the server deletes tables with matching `roomId` and inserts provided documents, ensuring inserted docs include `roomId`.
  - `GET /api/rooms` — return list of rooms.
  - `POST /api/rooms` — create a new room. Body: `{ title: string, width: number, height: number }`.
  - `PUT /api/rooms/:id` — update room metadata (title/width/height).
@@ -57,7 +55,7 @@ Notes:
 
 ## Realtime & caching
 - Publish events to Redis pub/sub after writing to `events` (or after updating the cached state). Clients subscribe to receive immediate updates.
-- Cache `GET /api/state` materialized snapshots in memory or Redis for low-latency reads. Invalidate/update on new `events` writes.
+ - Cache `GET /api/rooms/:id/state` materialized snapshots in memory or Redis for low-latency reads. Invalidate/update on new `events` writes.
  - Environment: the app reads `REDIS_URL` (e.g. `redis://localhost:6379`) from env; ensure this is set for production or local testing.
  - Channels: use `tables:room:<id>` for room-scoped table updates and `tables:all` for global table changes. Payloads may be lightweight notifications or full payloads depending on performance needs.
 
@@ -79,7 +77,7 @@ Notes:
 - For reliability, consider MongoDB transactions if you need strong atomicity between writing `audit` and updating caches.
 
 ## Next steps (recommended)
-1. Implement `POST /api/audit`, `GET /api/audit` and `GET /api/state` (state reducer + optional caching).
+1. Implement `POST /api/audit`, `GET /api/audit` and `GET /api/rooms/:id/state` (state reducer + optional caching).
 2. Provide `GET /api/tables` (geometry) and a simple `RoomMap` implementation in the frontend.
 3. Add Redis pub/sub wiring so new `audit` writes trigger realtime notifications to clients.
 4. (Done) Expose an SSE endpoint for room table updates at `GET /api/rooms/:id/tables/subscribe` so clients can open an `EventSource` and reload room tables on changes.

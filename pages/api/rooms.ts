@@ -13,7 +13,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
   const col = db.collection('rooms')
   try {
     if (req.method === 'GET') {
-      const docs = await col.find().toArray()
+      const docs = await col.find().toArray() as RoomDoc[]
       return res.status(200).json({ ok: true, rooms: docs })
     }
 
@@ -24,7 +24,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
       }
       const doc = { title: body.title, width: body.width, height: body.height }
       const r = await col.insertOne(doc)
-      const created = await col.findOne({ _id: r.insertedId })
+      const created = await col.findOne({ _id: r.insertedId }) as RoomDoc
       return res.status(201).json({ ok: true, rooms: created })
     }
 
@@ -39,7 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
       if (typeof body.height === 'number') update.height = body.height
       if (Object.keys(update).length === 0) return res.status(400).json({ ok: false, error: 'no update fields' })
       await col.updateOne({ _id: new ObjectId(id) }, { $set: update })
-      const updated = await col.findOne({ _id: new ObjectId(id) })
+      const updated = await col.findOne({ _id: new ObjectId(id) }) as RoomDoc
       return res.status(200).json({ ok: true, rooms: updated })
     }
 

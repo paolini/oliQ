@@ -22,5 +22,5 @@ API
 - `POST /api/queue/join` — join queue
 - `POST /api/queue/leave` — leave queue
 - `GET /api/queue/status` — snapshot
-- `GET /api/tables` — tables
-- `POST /api/tables/:id/state` — change table state
+- `GET /api/rooms/:id/tables` — tables for a room
+- `POST /api/rooms/:id/tables` — replace tables for a room (tooling)
