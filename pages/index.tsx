@@ -21,7 +21,9 @@ export default function Home() {
 
   const [gridMode, setGridMode] = useState(false)
   const [gridShape, setGridShape] = useState<'square' | 'circle'>('square')
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [gridAction, setGridAction] = useState<'add' | 'squares' | 'circles'>('add')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [selectionRect, setSelectionRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
   const [roomWidth, setRoomWidth] = useState<number | undefined>(800)
   const [roomHeight, setRoomHeight] = useState<number | undefined>(600)
 
@@ -61,15 +63,20 @@ export default function Home() {
     const y = Math.min(rect.y1, rect.y2)
     const w = Math.abs(rect.x2 - rect.x1)
     const h = Math.abs(rect.y2 - rect.y1)
-    const ids = tables.filter(t => t.x >= x && t.x <= x + w && t.y >= y && t.y <= y + h).map(t => t.id)
-    setSelectedIds(ids)
+    const ids = tables.filter(t => t.x >= x && t.x <= x + w && t.y >= y && t.y <= y + h).map(t => t._id || '')
+    setSelectedIds(ids.filter(Boolean))
   }
 
   const handleSelectionComplete = async (rect: { x1: number; y1: number; x2: number; y2: number }) => {
-    if (!gridMode) {
-      selectTablesInRect(rect)
-      return
-    }
+    // always store the last selection rectangle
+    setSelectionRect(rect)
+    // always select tables inside rect; grid creation is triggered by button
+    selectTablesInRect(rect)
+    return
+  }
+
+  const createGridFromRect = async (rect: { x1: number; y1: number; x2: number; y2: number }, shapeOverride?: 'square' | 'circle') => {
+    if (!rect) return
     const rowsStr = prompt('Number of rows?')
     const colsStr = prompt('Number of columns?')
     if (!rowsStr || !colsStr) return
@@ -85,14 +92,14 @@ export default function Home() {
     const cellW = w / Math.max(1, cols)
     const cellH = h / Math.max(1, rows)
 
-    const maxId = tables.reduce((m, t) => Math.max(m, t.id || 0), 0)
     const newTables: Table[] = []
-    let nextId = maxId + 1
+    let tmpCounter = Date.now()
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const cx = x + (c + 0.5) * cellW
         const cy = y + (r + 0.5) * cellH
-        const tbl = { id: nextId++, x: Math.round(cx), y: Math.round(cy), shape: gridShape, status: 'normal' }
+        const shapeToUse = shapeOverride || gridShape
+        const tbl = { _id: `tmp-${tmpCounter++}`, participant_ids: [], x: Math.round(cx), y: Math.round(cy), shape: shapeToUse, rotation: undefined }
         newTables.push(tbl)
       }
     }
@@ -102,23 +109,46 @@ export default function Home() {
 
     // persist new tables via tooling endpoint POST /api/tables (replace all)
     try {
-      // send combined list: existing tables + newTables mapped to mongo shape
       const payload = [...tables, ...newTables].map(t => ({ participant_ids: t.participant_ids || [], x: t.x, y: t.y, shape: t.shape, rotation: t.rotation }))
       const res = await fetch('/api/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (!res.ok) {
         const txt = await res.text().catch(() => 'upsert failed')
         throw new Error(txt)
       }
+      await reloadTables()
     } catch (err: any) {
       console.error('failed to persist new tables', err)
       setError(err?.message || String(err))
     }
 
-    setGridMode(false)
+    setSelectionRect(null)
     alert(`Created ${newTables.length} tables`)
   }
 
   const clearSelection = () => setSelectedIds([])
+
+  const clearSelectionAndRect = () => { setSelectedIds([]); setSelectionRect(null) }
+
+  const reloadTables = async () => {
+    try {
+      const res = await fetch('/api/tables')
+      if (!res.ok) throw new Error('failed to reload tables')
+      const data = await res.json()
+      const docs = data.tables || []
+      const mapped: Table[] = docs.map((t: any) => ({
+        _id: t._id ? String(t._id) : undefined,
+        participant_ids: Array.isArray(t.participant_ids) ? t.participant_ids.map(Number) : [],
+        x: Number(t.x) || 0,
+        y: Number(t.y) || 0,
+        shape: t.shape === 'circle' ? 'circle' : 'square',
+        rotation: typeof t.rotation === 'number' ? t.rotation : undefined,
+      }))
+      setTables(mapped)
+    } catch (err: any) {
+      console.error('reloadTables failed', err)
+      setError(err?.message || String(err))
+    }
+  }
 
   
 
@@ -127,16 +157,17 @@ export default function Home() {
     if (!confirm(`Delete ${selectedIds.length} selected table(s)?`)) return
 
     // optimistic update
-    setTables(prev => prev.filter(t => !selectedIds.includes(t.id)))
+    setTables(prev => prev.filter(t => !(t._id && selectedIds.includes(t._id))))
     try {
       // persist remaining tables via tooling endpoint POST /api/tables (replace all)
-      const remaining = tables.filter(t => !selectedIds.includes(t.id))
+      const remaining = tables.filter(t => !(t._id && selectedIds.includes(t._id)))
       const payload = remaining.map(t => ({ participant_ids: t.participant_ids || [], x: t.x, y: t.y, shape: t.shape, rotation: t.rotation }))
       const res = await fetch('/api/tables', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if (!res.ok) {
         const txt = await res.text().catch(() => 'delete failed')
         throw new Error(txt)
       }
+      await reloadTables()
     } catch (err: any) {
       console.error('failed to persist delete', err)
       setError(err?.message || String(err))
@@ -147,21 +178,27 @@ export default function Home() {
   const renumberSelectedTables = async (start: number) => {
     if (selectedIds.length === 0) return
 
-    // compute ordering: top-to-bottom rows, left-to-right within each row
-    const selectedTables = tables.filter(t => selectedIds.includes(t.id))
+    // compute ordering: top-to-bottom (y asc), left-to-right (x asc)
+    const selectedTables = tables.filter(t => t._id && selectedIds.includes(t._id)).slice()
     selectedTables.sort((a, b) => {
       if (a.y === b.y) return (a.x || 0) - (b.x || 0)
       return (a.y || 0) - (b.y || 0)
     })
 
+    // assign numbers in sorted order, store in map by _id so we can apply to original tables array
     let next = start
-    const updates: any[] = []
-    const newTables = tables.map(t => {
-      if (!selectedIds.includes(t.id)) return t
+    const assignMap: Record<string, number[]> = {}
+    for (const t of selectedTables) {
       const isCircle = t.shape === 'circle'
       const ids = isCircle ? [next, next + 1] : [next]
+      assignMap[String(t._id)] = ids
       next += ids.length
-      updates.push({ ...t, participant_ids: ids })
+    }
+
+    const newTables = tables.map(t => {
+      if (!t._id) return t
+      const ids = assignMap[String(t._id)]
+      if (!ids) return t
       return { ...t, participant_ids: ids }
     })
 
@@ -174,6 +211,7 @@ export default function Home() {
         const txt = await res.text().catch(() => 'renumber failed')
         throw new Error(txt)
       }
+      await reloadTables()
     } catch (err: any) {
       console.error('failed to persist renumber', err)
       setError(err?.message || String(err))
@@ -206,41 +244,42 @@ export default function Home() {
             </label>
           </div>
           <div style={{ display: 'flex', gap: 8, padding: 8, alignItems: 'center' }}>
-            <select
-              value={gridMode ? gridShape : 'idle'}
-              onChange={e => {
-                const v = e.target.value
-                if (v === 'idle') {
-                  setGridMode(false)
-                } else if (v === 'cancel') {
-                  setGridMode(false)
-                } else if (v === 'squares' || v === 'circles') {
-                  const shape = v === 'squares' ? 'square' : 'circle'
-                  setGridShape(shape)
-                  setGridMode(true)
-                }
-              }}
-              style={{ padding: 6 }}
-            >
-              <option value="idle">add grid</option>
-              <option value="squares">squares</option>
-              <option value="circles">circles</option>
-              {gridMode && <option value="cancel">Cancel</option>}
-            </select>
-            {gridMode && <div style={{ color: '#1976d2' }}>Select area on the map to place the grid</div>}
+            <div style={{ color: '#999' }}>{!selectionRect && 'Select an area to enable grid'}</div>
           </div>
-          {selectedIds.length > 0 && (
+          {(selectedIds.length > 0 || selectionRect) && (
             <div style={{ padding: 8, background: '#fff8e1', display: 'flex', gap: 8, alignItems: 'center' }}>
-              <div>{selectedIds.length} selected</div>
-              <button onClick={deleteSelectedTables} style={{ color: '#b71c1c' }}>Delete</button>
-              <button onClick={async () => {
-                const startStr = prompt('Numero del primo posto (intero)?')
-                if (!startStr) return
-                const start = Number(startStr)
-                if (!Number.isInteger(start)) return alert('Inserire un numero intero valido')
-                await renumberSelectedTables(start)
-              }}>Renumber</button>
-              <button onClick={clearSelection}>Clear</button>
+              <div>{selectedIds.length > 0 ? `${selectedIds.length} selected` : '0 selected'}</div>
+              <button onClick={deleteSelectedTables} style={{ color: '#b71c1c' }} disabled={selectedIds.length === 0}>Delete</button>
+              {selectionRect && (
+                <select
+                  value={gridAction}
+                  onChange={async e => {
+                    const v = e.target.value as 'add' | 'squares' | 'circles'
+                    setGridAction(v)
+                    if (!selectionRect) return
+                    if (v === 'squares' || v === 'circles') {
+                      const shape = v === 'squares' ? 'square' : 'circle'
+                      await createGridFromRect(selectionRect, shape)
+                      setGridAction('add')
+                    }
+                  }}
+                  style={{ padding: 6 }}
+                >
+                  <option value="add">add grid</option>
+                  <option value="squares">squares</option>
+                  <option value="circles">circles</option>
+                </select>
+              )}
+              {selectedIds.length > 0 && (
+                <button onClick={async () => {
+                  const startStr = prompt('Numero del primo posto (intero)?')
+                  if (!startStr) return
+                  const start = Number(startStr)
+                  if (!Number.isInteger(start)) return alert('Inserire un numero intero valido')
+                  await renumberSelectedTables(start)
+                }}>Renumber</button>
+              )}
+              <button onClick={clearSelectionAndRect}>cancel</button>
             </div>
           )}
           <div style={{ width: roomWidth || 360, height: roomHeight || 640 }}>
@@ -249,7 +288,7 @@ export default function Home() {
                 {error}
               </div>
             )}
-            <RoomMap tables={tables.slice(0, 300) as any} width={roomWidth || 360} height={roomHeight || 640} onTableClick={handleTableClick} onSelectionComplete={handleSelectionComplete} roomWidth={roomWidth} roomHeight={roomHeight} />
+            <RoomMap tables={tables.slice(0, 300) as any} width={roomWidth || 360} height={roomHeight || 640} onTableClick={handleTableClick} onSelectionComplete={handleSelectionComplete} selectionRect={selectionRect} roomWidth={roomWidth} roomHeight={roomHeight} />
           </div>
         </div>
       </section>
