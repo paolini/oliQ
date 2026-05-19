@@ -7,56 +7,62 @@ This document describes the "Virtual Queue" project and the responsibilities exp
 - Scale: 300 tables, moderate concurrent usage (many assistants using mobile clients).
 - Tech stack: Next.js (frontend + API routes), MongoDB (persistent models), Redis (fast queue operations / pubsub).
 
-## Data model (high level)
-- `Table`: { id: integer (1..300), x: number, y: number, shape: enum('square','semicircle-left','semicircle-right'), rotation?: number, status?: enum('normal','raised-hand','queued','in-bathroom') }
-- Queue representation: Redis list(s) per queue (single global bathroom queue by default). MongoDB stores final state/history and table records. Participant details are represented only by their numeric identifier in queue events (no separate `Participant` collection required).
+## Key design principles
+- Tables are immutable geometry documents: created at setup and not changed during the contest (position/shape fixed).
+- All runtime activity is recorded in a single append-only `events` collection. The `events` collection contains participant-oriented events only — it must not reference tables or seats.
+- State for the UI (who is queued, called, checked-in) is derived by reducing the `events` log; for responsiveness the server may cache a materialized `state` view, but the `events` collection is authoritative.
 
-## API surface (required)
-- `POST /api/queue/join` — payload: { participantNumber, tableId } — push participant into Redis queue and persist join event (audit record with timestamp).
-- `POST /api/queue/leave` — payload: { participantNumber } — remove participant from queue (or pop next) and persist leave event (audit record with timestamp).
-- `GET /api/queue/status` — return queue snapshot (ordered list of participant numbers, positions, ETA estimate), optionally table map. Source of truth for order: Redis list; MongoDB provides history/audit.
-- `GET /api/tables` — return all 300 tables and positions, including `status` and `lastStatusChange` timestamps.
-- `POST /api/tables/:id/state` — payload: { status: 'normal'|'raised-hand'|'queued'|'in-bathroom', participantNumber?: integer } — update a table's state, set `lastStatusChange`, and emit an audit event and realtime pub/sub message. If status changes to `queued`, client may include `participantNumber` to add to queue.
-- `GET /api/audit` — optional: return recent audit log entries (joins/leaves/state changes) for debugging and analytics.
-- WebSocket or Redis Pub/Sub endpoint to push queue and table state changes to connected clients in realtime.
+## Database model
+- `tables` (immutable map geometry)
+  - Document shape:
+    - { id: number, x: number, y: number, shape: 'square'|'circle', rotation?: number }
+ - `events` (append-only event log — source of truth for participant activity)
+  - Document shape:
+    - { ts: Date, event: 'raise-hand'|'join-queue'|'bathroom-1'|'bathroom-2'|'seat', participantNumber: number, }
 
-## Agent responsibilities
-- Create, update, and review API routes and data models consistent with stack above.
-- Implement Redis-backed queue operations with atomic semantics (LPUSH/RPUSH + LPOP or blocking ops depending on UX).
-- Ensure MongoDB models for participants & tables, and an audit log for joins/leaves.
-- Implement Next.js mobile-first UI that shows:
-  - a 300-table layout (grid or map) with table statuses,
-  - current queue (ordered list) and participant positions,
-  - controls for assistants to `join` or `call next`.
-- Add realtime updates using WebSocket (Next.js) or Redis pub/sub.
-- Provide docker-compose for local dev with MongoDB and Redis, and `.env.example` for secrets.
+## How current state is obtained
+- The server provides `GET /api/state` which reduces recent `events` entries (or returns a cached snapshot) and computes the participant-oriented view: queue order (from Redis), who was called, who is checked-in, etc.
+- For realtime UX, write to `events` then update cache and publish a Redis pub/sub message so clients receive updates.
 
-## Rendering choice: SVG (mobile-first)
+## API (canonical list)
+- `POST /api/events` — append an event to `events`. Body: `{ type, participantNumber?, details? }`.
+- `GET /api/events` — query the events log (filters: participantNumber, type, since/until).
+- `GET /api/state` — return computed state (optionally cached). Supports filters for participant or time window.
+ - `POST /api/queue/join` — push participant into Redis queue and append an `events` record.
+ - `POST /api/queue/leave` — remove participant from Redis queue and append an `events` record.
+- `GET /api/queue/status` — return queue snapshot (ordered list + ETA estimate). Source of order: Redis.
+- `GET /api/tables` — return all table geometry documents (for rendering the map).
 
-- **Decision:** Use SVG for the room map and table rendering.
-- **Rationale:** SVG provides crisp scalable shapes, easy hit-testing for touch, small DOM footprint for 300 simple elements, and straightforward support for rotation/transform for semicircles and custom shapes. It is also easier to style and animate with CSS/SMIL and integrates well with React/Next.js.
-- **When to consider Canvas:** If profiling shows rendering or update bottlenecks on low-end devices (many frequent simultaneous animations or extremely high update rates), we can migrate to Canvas for rasterized drawing.
+Notes:
+- Avoid duplicating these endpoints in other docs — this is the canonical list.
+- If you need auxiliary endpoints (e.g., `/api/tables/upsert`) keep them small and documented in code.
 
-## Frontend implementation notes (mobile-first)
+## Realtime & caching
+- Publish events to Redis pub/sub after writing to `events` (or after updating the cached state). Clients subscribe to receive immediate updates.
+- Cache `GET /api/state` materialized snapshots in memory or Redis for low-latency reads. Invalidate/update on new `events` writes.
 
-- Add a `RoomMap` React component that:
-  - Accepts `Table[]` from `/api/tables`.
-  - Maps table `x,y` coordinates into a scalable SVG viewBox and renders each table as an SVG element (square or semicircle) with `transform` for rotation.
-  - Provides touch handlers: `onTap` -> open bottom sheet with table details and actions.
-  - Supports pinch-to-zoom and pan (use a lightweight library or implement gesture handlers with pointer events).
-- Use a bottom sheet component for `Table` details and actions (`raise-hand`, `queue/join`, `in-bathroom`) calling existing API routes.
-- Subscribe to realtime updates via a WebSocket or SSE endpoint that forwards Redis pub/sub events; update local state and re-render affected SVG nodes only.
-- Performance: batch updates, debounce rapid events, and use `requestAnimationFrame` for animated state transitions.
+## Frontend (mobile-first)
+- Rendering choice: **SVG** for the room map and table rendering (crisp shapes, easy hit-testing, small DOM for 300 elements).
+- `RoomMap` React component responsibilities:
+  - Accept `Table[]` from `/api/tables` and render each as an SVG primitive.
+  - Map table `x,y` coordinates into a scalable `viewBox`.
+  - Support touch handlers (`tap` -> bottom sheet), pinch-to-zoom and pan.
+  - Allow rectangle selection for grid insertion (tooling mode) and selection-based bulk edits.
+- UI patterns:
+  - Bottom sheet for table details and quick actions (raise-hand, join queue, call next).
+  - Compact queue view (ordered) and a map view.
+  - Batch and debounce frequent updates; use `requestAnimationFrame` for animations.
 
-## Next steps
+## Operational notes for agents
+- Always append to `events` for user actions. Then update cache and publish pub/sub messages.
+- Keep `tables` immutable after initial creation; any geometry changes are part of setup tooling, not runtime.
+- For reliability, consider MongoDB transactions if you need strong atomicity between writing `audit` and updating caches.
 
-1. Create `components/RoomMap.tsx` rendering SVG and a simple `Table` SVG primitive.
-2. Add client subscription example to the demo page (`pages/index.tsx`) to show realtime updates.
-3. Profile on a mid-range Android device; migrate to Canvas only if necessary.
+## Next steps (recommended)
+1. Implement `POST /api/audit`, `GET /api/audit` and `GET /api/state` (state reducer + optional caching).
+2. Provide `GET /api/tables` (geometry) and a simple `RoomMap` implementation in the frontend.
+3. Add Redis pub/sub wiring so new `audit` writes trigger realtime notifications to clients.
 
-
-
-## Developer notes for agents
-- Use Redis for queue semantics and MongoDB for persistent state and history. Keep API surface minimal and well-documented.
-- When adding new features, keep this file updated.
-
+## Developer notes
+- Use Redis for queue semantics and pub/sub; MongoDB `audit` is the single source of truth for history.
+- Keep this document updated when API or data-model decisions change.
