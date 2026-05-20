@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import redis from '../../../../../lib/redis'
+import redis from '../../../../lib/redis'
 
 export const config = {
   api: {
@@ -8,8 +8,8 @@ export const config = {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { id } = req.query
-  const roomId = Array.isArray(id) ? id[0] : id
+  if (typeof req.query.id !== 'string') return res.status(400).json({ error: 'invalid id' })
+  const roomId = req.query.id as string
   if (req.method !== 'GET') return res.status(405).end()
 
   res.writeHead(200, {
@@ -19,13 +19,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   })
   res.write('\n')
 
-  const channel = roomId ? `state:room:${roomId}` : 'state:all'
+  const channel = `room:${roomId}`
   const sub = redis.duplicate()
 
   // subscribe and forward messages
   await sub.subscribe(channel)
 
   const onMessage = (_chan: string, message: string) => {
+    console.log(`Publishing message to client for room ${roomId}:`, message)
     try {
       res.write(`data: ${message}\n\n`)
     } catch (e) {

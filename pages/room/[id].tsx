@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import RoomMap from '../../components/RoomMap'
+import { State } from '../../lib/models/event'
 
 type Table = { _id?: string, participant_ids?: number[], x: number, y: number, shape?: 'square' | 'circle', rotation?: number }
 
@@ -10,6 +11,7 @@ export default function RoomPage() {
   const roomId = Array.isArray(id) ? id[0] : id
 
   const [tables, setTables] = useState<Table[]>([])
+  const [state, setState] = useState<State>([])
   const [error, setError] = useState<string | null>(null)
   const [roomTitle, setRoomTitle] = useState<string>('')
   const [roomWidth, setRoomWidth] = useState<number | undefined>(800)
@@ -21,15 +23,32 @@ export default function RoomPage() {
 
   useEffect(() => {
     if (!roomId) return
+
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/rooms/${encodeURIComponent(String(roomId))}/state`)
+        if (!res.ok) throw new Error('failed to load room state')
+        const jd = await res.json()
+        setState(jd.state || [])
+      } catch (err:any) {
+        console.error('Error loading room state:', err)
+        setError(err?.message || String(err))
+      }
+    })()
+
     // subscribe to server-sent events for live table updates
     let es: EventSource | null = null
     try {
-      es = new EventSource(`/api/rooms/${encodeURIComponent(String(roomId))}/tables/subscribe`)
+      es = new EventSource(`/api/rooms/${roomId}/subscribe`)
+
       es.addEventListener('message', (ev) => {
         try { 
           const msg = JSON.parse(ev.data); 
           if (msg && (msg.type === 'tables:replace' || msg.type === 'tables:update')) { 
             reloadTables() } 
+          if (msg && msg.type === 'state:change') {
+            updateState(msg.state) // update local state cache with new state from server
+          }
         } catch (e) { 
             reloadTables() 
         }
@@ -59,6 +78,7 @@ export default function RoomPage() {
         setTables(mapped)
       } catch (err:any) { setError(err?.message || String(err)) }
     })()
+
     return () => { mounted = false }
   }, [roomId])
 
@@ -83,6 +103,12 @@ export default function RoomPage() {
   const handleSelectionComplete = async (rect: { x1: number; y1: number; x2: number; y2: number }) => {
     setSelectionRect(rect)
     selectTablesInRect(rect)
+  }
+
+  const updateState = (state: State) => {
+    // update local state with new state from server
+    // for simplicity, we just log it here; in a real app you'd want to merge it into your UI state
+    console.log('Received new room state from server:', state)
   }
 
   const reloadTables = async () => {
@@ -218,10 +244,12 @@ export default function RoomPage() {
         </div>
       </div>
 
+      {JSON.stringify({state})}
+
       {/* simplified view portion */}
       <div style={{ position: 'relative', width: roomWidth||360, height: roomHeight||640, border: '1px solid #eee' }}>
         {error && <div style={{ color: 'red' }}>{error}</div>}
-        <RoomMap editable={editMode} tables={tables as any} width={roomWidth||360} height={roomHeight||640} onTableClick={handleTableClick} onSelectionComplete={handleSelectionComplete} selectionRect={selectionRect} roomWidth={roomWidth} roomHeight={roomHeight} roomId={roomId as string} />
+        <RoomMap editable={editMode} tables={tables as any} state={state} width={roomWidth||360} height={roomHeight||640} onTableClick={handleTableClick} onSelectionComplete={handleSelectionComplete} selectionRect={selectionRect} roomWidth={roomWidth} roomHeight={roomHeight} roomId={roomId as string} />
         {editMode && (
           <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
             {!selectionRect ? (

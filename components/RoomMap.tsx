@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
-import TablePrimitive from './TablePrimitive'
+import TablePrimitive, { ParticipantStatus } from './TablePrimitive'
 import EventPicker from './EventPicker'
+import { State } from '../lib/models/event'
 
 type Table = {
   _id?: string
@@ -14,6 +15,7 @@ type Table = {
 
 type Props = {
   tables: Table[]
+  state: State
   width?: number
   height?: number
   onTableClick?: (id?: string) => void
@@ -24,16 +26,15 @@ type Props = {
   roomWidth?: number
   roomHeight?: number
   editable?: boolean
-  roomId?: string
+  roomId: string
 }
 
-export default function RoomMap({ tables, width = 360, height = 640, onTableClick, onSelectionComplete, selectionRect: externalRect, roomWidth, roomHeight, editable = true, roomId }: Props) {
+export default function RoomMap({ tables, state, width = 360, height = 640, onTableClick, onSelectionComplete, selectionRect: externalRect, roomWidth, roomHeight, editable = true, roomId }: Props) {
   const padding = 20
   const [selecting, setSelecting] = useState(false)
   const [rect, setRect] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
-  const [pickerParticipant, setPickerParticipant] = useState<number | null>(null)
-  const [participantState, setParticipantState] = useState<Record<number, any>>({})
+  const [pickerParticipant, setPickerParticipant] = useState<string | null>(null)
 
   const bounds = useMemo(() => {
     if (!tables || tables.length === 0) return { minX: 0, maxX: 1000, minY: 0, maxY: 1000 }
@@ -50,10 +51,10 @@ export default function RoomMap({ tables, width = 360, height = 640, onTableClic
     if (onTableClick) onTableClick(id)
   }
 
-  const handleSeatClick = (participantNumber: number) => {
+  const handleSeatClick = (participant: string) => {
     // open picker only when NOT in editable (editMode=false => view mode)
     if (editable) return
-    setPickerParticipant(participantNumber)
+    setPickerParticipant(participant)
   }
 
   const closePicker = () => setPickerParticipant(null)
@@ -64,27 +65,6 @@ export default function RoomMap({ tables, width = 360, height = 640, onTableClic
     console.log('Selected event', eventType, 'for', pickerParticipant)
     closePicker()
   }
-
-  // subscribe to room state SSE to keep UI in sync
-  useEffect(() => {
-    if (!roomId) return
-    const url = `/api/rooms/${encodeURIComponent(roomId)}/state/subscribe`
-    const es = new EventSource(url)
-    es.onmessage = (ev) => {
-      try {
-        const data = JSON.parse(ev.data)
-        // expect { state: { participants, queue } } or raw participants
-        const participants = data.state?.participants ?? data.participants ?? {}
-        setParticipantState(participants)
-      } catch (e) {
-        console.error('Failed parse SSE', e)
-      }
-    }
-    es.onerror = () => {
-      es.close()
-    }
-    return () => es.close()
-  }, [roomId])
 
   const clientToSvg = (clientX: number, clientY: number) => {
     const svg = svgRef.current
@@ -140,27 +120,30 @@ export default function RoomMap({ tables, width = 360, height = 640, onTableClic
     return <rect x={x} y={y} width={w} height={h} fill="rgba(33,150,243,0.15)" stroke="#2196f3" strokeDasharray="4 3" />
   }
 
+  const participantStatus: Record<string, ParticipantStatus> = useMemo(() => {
+    const positions: Record<string, number> = {}
+    const status: Record<string, ParticipantStatus> = {}
+    for (const entry of state) {
+      const key = entry.state
+      const participant = entry.participant
+      const position = (positions[key] || 0) + 1
+      positions[key] = position
+      status[participant] = { id: participant, state: key, position }
+    }
+    return status
+  }, [state])
+
   return (
     <div style={{ width, height, touchAction: 'none' }}>
       <svg ref={svgRef} width="100%" height="100%" viewBox={viewBox} preserveAspectRatio="none" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
         <rect x={0} y={0} width={roomWidth || (bounds.maxX - bounds.minX + padding * 2)} height={roomHeight || (bounds.maxY - bounds.minY + padding * 2)} fill="#fafafa" />
         {tables.map(t => {
-          // derive status from participantState if available
-          let status = t.status || ''
-          if (t.participant_ids && t.participant_ids.length > 0) {
-            for (const pn of t.participant_ids) {
-              const p = participantState[pn]
-              if (p?.lastEvent === 'raise-hand') { status = 'raise-hand'; break }
-              if (p?.lastEvent === 'join-queue') { status = 'in-queue'; break }
-              if (p?.lastEvent && p?.lastEvent.startsWith('bathroom')) { status = 'in-bathroom'; break }
-            }
-          }
-          return <TablePrimitive key={t._id || `${t.x}-${t.y}`} _id={t._id} participant_ids={t.participant_ids} x={t.x} y={t.y} shape={t.shape || 'square'} rotation={t.rotation || 0} status={status} onClick={handleClick} editable={editable} onSeatClick={handleSeatClick} />
+          return <TablePrimitive key={t._id || `${t.x}-${t.y}`} _id={t._id} participant_states={(t.participant_ids || []).map(id => (participantStatus[`${id}`] || {id, state:'', position: 0}))} x={t.x} y={t.y} shape={t.shape || 'square'} rotation={t.rotation || 0} onClick={handleClick} editable={editable} onSeatClick={handleSeatClick} />
         })}
         {renderSelectionRect()}
       </svg>
       {pickerParticipant !== null && (
-        <EventPicker participantNumber={pickerParticipant} onClose={closePicker} onSelect={handleEventSelect} roomId={roomId} />
+        <EventPicker participant={pickerParticipant} onClose={closePicker} onSelect={handleEventSelect} roomId={roomId} />
       )}
     </div>
   )

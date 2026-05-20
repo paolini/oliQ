@@ -42,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
       const docsToInsert = payload.map((t:any) => ({ ...t, roomId: (() => { try { return new ObjectId(id) } catch { return id } })() }))
       await col.insertMany(docsToInsert)
       // publish update for this room so clients can reload
-      try { await redis.publish(`tables:room:${id}`, JSON.stringify({ type: 'tables:replace', roomId: id, count: docsToInsert.length })) } catch (e) { console.error('redis publish room tables failed', e) }
+      try { await redis.publish(`room:${id}`, JSON.stringify({ type: 'tables:replace', roomId: id, count: docsToInsert.length })) } catch (e) { console.error('redis publish room tables failed', e) }
       const docs = await col.find({ roomId: docsToInsert[0].roomId }).toArray()
       return res.status(201).json({ ok: true, tables: docs })
     }
