@@ -1,7 +1,4 @@
 import React from 'react'
-import state from '../pages/api/rooms/[id]/state'
-
-
 export type ParticipantStatus = {
     id: string
     state: string
@@ -30,14 +27,18 @@ export default function TablePrimitive({ _id, participant_states, x, y, size = 4
     style: { cursor: editable ? 'default' : 'pointer' },
   }
 
-  function Seat({x, y, state}: {x: number, y: number, state: ParticipantStatus}) {
+  function Seat({x, y, state}: {x: number, y: number, state?: ParticipantStatus | null}) {
+    const sid = state?.id ?? '?'
+    const sstate = state?.state ?? ''
+    const pos = state?.position ?? ''
+
     return <>
-      { state.state.startsWith('bathroom') && <text x={x} y={y-20} fontSize={14} textAnchor="middle" fill="#ffffff">🚻</text> }
-      { state.state.startsWith('queue') && <>
+      { sstate.startsWith('bathroom') && <text x={x} y={y-20} fontSize={14} textAnchor="middle" fill="#ffffff">🚻</text> }
+      { sstate.startsWith('queue') && <>
         <circle cx={x} cy={y-26} r={12} fill="#f44336" />
-        <text x={x} y={y-22} fontSize={14} textAnchor="middle" fill="#ffffff">{state.position}</text>
+        <text x={x} y={y-22} fontSize={14} textAnchor="middle" fill="#ffffff">{pos}</text>
       </> }
-      <text x={x} y={y+2} fontSize={20} textAnchor="middle" fill="#000000" onClick={(e) => { e.stopPropagation(); if (!editable && onSeatClick) onSeatClick(state.id); }}>{state.id}</text>
+      <text x={x} y={y+2} fontSize={20} textAnchor="middle" fill="#000000" onClick={(e) => { e.stopPropagation(); if (!editable && onSeatClick) onSeatClick(sid); }}>{sid}</text>
     </>
   }
 
