@@ -2,8 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import { getMongoClient } from '../../../../lib/mongo'
 import { ObjectId } from 'mongodb'
 import redis from '../../../../lib/redis'
-import { Event, updateState } from '../../../../lib/models/event'
-import { getState, getUpdatedState } from './state'
+import { Event } from '../../../../lib/models/event'
+import { getUpdatedState } from './state'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;

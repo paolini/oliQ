@@ -49,7 +49,7 @@ export default function RoomPage() {
             const incoming = msg.state
             if (incoming) updateState(incoming)
           }
-        } catch (e) {
+        } catch {
           reloadTables()
         }
       })

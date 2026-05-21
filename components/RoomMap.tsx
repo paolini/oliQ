@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react'
+import React, { useMemo, useState, useRef } from 'react'
 import TablePrimitive, { ParticipantStatus } from './TablePrimitive'
 import EventPicker from './EventPicker'
 import { State } from '../lib/models/event'
@@ -90,7 +90,7 @@ export default function RoomMap({ tables, state, width = 360, height = 640, onSe
     setRect({ ...rect, x2: p.x, y2: p.y })
   }
 
-    const onPointerUp = (e: React.PointerEvent) => {
+    const onPointerUp = () => {
       if (!editable) return
       if (!selecting || !rect) return
       setSelecting(false)

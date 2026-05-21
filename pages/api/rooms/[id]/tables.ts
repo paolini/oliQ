@@ -49,7 +49,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
       // publish update for this room so clients can reload
       try {
         const payload = JSON.stringify({ type: 'tables:replace', roomId: id, count: docsToInsert.length })
-        const pubResult = await redis.publish(`room:${id}`, payload)
+        await redis.publish(`room:${id}`, payload)
       } catch (e) { console.error('redis publish room tables failed', e) }
       const docs = await col.find({ roomId: docsToInsert[0].roomId }).toArray()
       return res.status(201).json({ ok: true, tables: docs })

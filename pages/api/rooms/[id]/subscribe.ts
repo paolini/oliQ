@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`Publishing message to client for room ${roomId}:`, message)
     try {
       res.write(`data: ${message}\n\n`)
-    } catch (e) {
+    } catch {
       // ignore
     }
   }
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       sub.off('message', onMessage)
       await sub.unsubscribe(channel)
       try { await sub.quit() } catch { sub.disconnect() }
-    } catch (e) {
+    } catch {
       // ignore
     }
   })

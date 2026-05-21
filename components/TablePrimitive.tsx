@@ -45,7 +45,6 @@ export default function TablePrimitive({ _id, participant_states, x, y, size = 4
   // circle: larger, two seats (left/right)
   if (shape === 'circle') {
     const r = size * 0.7
-    const seatR = Math.max(4, size * 0.18)
     // debug log to inspect participant ids
     // eslint-disable-next-line no-console
     return (
