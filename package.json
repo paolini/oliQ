@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
-    "start": "next start -p 3000"
+    "start": "next start -p 3000",
+    "docker:build": "docker build -t paolini/oliq .",
+    "docker:run": "docker run --rm -p 3000:3000 --env-file .env.local paolini/oliq",
+    "docker:publish": "docker push paolini/oliq"
   },
   "dependencies": {
     "ioredis": "5.3.2",
