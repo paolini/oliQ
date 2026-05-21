@@ -22,7 +22,7 @@ type Props = {
   onSeatClick?: (participant: string) => void
 }
 
-export default function TablePrimitive({ _id, participant_states, x, y, size = 40, shape = 'square', rotation = 0, status, onClick, editable = true, onSeatClick }: Props) {
+export default function TablePrimitive({ _id, participant_states, x, y, size = 40, shape = 'square', rotation = 0, status, editable = true, onSeatClick }: Props) {
   const fill = status === 'in-bathroom' ? '#f44336' : status === 'raised-hand' ? '#ff9800' : status === 'queued' ? '#2196f3' : '#8bc34a'
 
   const commonProps: any = {
@@ -48,7 +48,7 @@ export default function TablePrimitive({ _id, participant_states, x, y, size = 4
     // debug log to inspect participant ids
     // eslint-disable-next-line no-console
     return (
-      <g {...commonProps} onClick={() => onClick && onClick(_id)}>
+      <g {...commonProps}>
         <circle cx={0} cy={0} r={r} fill={fill} stroke="#333" />
         <line x1={0} y1={-r} x2={0} y2={r} stroke="#333" strokeWidth={1} />
         <Seat x={-r * 0.55} y={4} state={participant_states[0]} />
@@ -61,7 +61,7 @@ export default function TablePrimitive({ _id, participant_states, x, y, size = 4
     const state = participant_states[0] || {id:'?', state:'', position:'0'}
 
     return (
-      <g {...commonProps} onClick={() => onClick && onClick(_id)}>
+      <g {...commonProps}>
         <rect x={-size / 2} y={-size / 2} width={size} height={size} rx={6} fill={fill} stroke="#333" />
         <Seat x={0} y={4} state={state} />
       </g>

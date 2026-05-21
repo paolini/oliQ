@@ -17,7 +17,7 @@ This document describes the "Virtual Queue" project and the responsibilities exp
 ## Database model
 - `tables` (immutable map geometry)
   - Document shape:
-    - { participant_ids: [number], x: number, y: number, shape: 'square'|'circle', rotation?: number, roomId?: ObjectId }
+    - { participant_ids: [string], x: number, y: number, shape: 'square'|'circle', rotation?: number, roomId?: ObjectId }
   - Note: `roomId` is stored as an `ObjectId` when possible; code also accepts a string fallback for convenience.
  - `rooms` (room definitions)
   - Document shape:

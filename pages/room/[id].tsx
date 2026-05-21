@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import RoomMap from '../../components/RoomMap'
 import { State } from '../../lib/models/event'
 
-type Table = { _id?: string, participant_ids?: number[], x: number, y: number, shape?: 'square' | 'circle', rotation?: number }
+type Table = { _id?: string, participant_ids: string[], x: number, y: number, shape?: 'square' | 'circle', rotation?: number }
 
 export default function RoomPage() {
   const router = useRouter()
@@ -70,12 +70,11 @@ export default function RoomPage() {
 
     ;(async () => {
       try {
-        const res = await fetch(`/api/rooms/${encodeURIComponent(String(roomId))}/tables`)
+        const res = await fetch(`/api/rooms/${roomId}/tables`)
         if (!res.ok) throw new Error('failed')
         const jd = await res.json()
         if (!mounted) return
-        const mapped: Table[] = (jd.tables || []).map((t:any) => ({ _id: t._id ? String(t._id) : undefined, participant_ids: Array.isArray(t.participant_ids) ? t.participant_ids.map(Number) : [], x: Number(t.x)||0, y: Number(t.y)||0, shape: t.shape==='circle'?'circle':'square', rotation: t.rotation }))
-        setTables(mapped)
+        setTables(jd.tables)
       } catch (err:any) { setError(err?.message || String(err)) }
     })()
 
@@ -88,8 +87,6 @@ export default function RoomPage() {
       // Note: EventSource created in other effect will be closed by browser automatically on unmount
     }
   }, [])
-
-  const handleTableClick = (id?: string) => { console.log('Table clicked', id) }
 
   const selectTablesInRect = (rect: { x1: number; y1: number; x2: number; y2: number }) => {
     const x = Math.min(rect.x1, rect.x2)
@@ -117,8 +114,7 @@ export default function RoomPage() {
       const res = await fetch(`/api/rooms/${encodeURIComponent(String(roomId))}/tables`)
       if (!res.ok) throw new Error('failed to reload tables')
       const jd = await res.json()
-      const mapped: Table[] = (jd.tables || []).map((t:any) => ({ _id: t._id ? String(t._id) : undefined, participant_ids: Array.isArray(t.participant_ids)?t.participant_ids.map(Number):[], x: Number(t.x)||0, y: Number(t.y)||0, shape: t.shape==='circle'?'circle':'square', rotation: t.rotation }))
-      setTables(mapped)
+      setTables(jd.tables)
     } catch (err:any) { console.error('reloadTables failed', err); setError(err?.message || String(err)) }
   }
 
@@ -202,10 +198,10 @@ export default function RoomPage() {
     const updatedMap: Record<string, Table> = {}
     for (const t of sel) {
       if (t.shape === 'circle') {
-        updatedMap[t._id || ''] = { ...t, participant_ids: [next, next+1] }
+        updatedMap[t._id || ''] = { ...t, participant_ids: [`${next}`, `${next+1}`] }
         next += 2
       } else {
-        updatedMap[t._id || ''] = { ...t, participant_ids: [next] }
+        updatedMap[t._id || ''] = { ...t, participant_ids: [`${next}`] }
         next += 1
       }
     }
@@ -249,7 +245,7 @@ export default function RoomPage() {
       {/* simplified view portion */}
       <div style={{ position: 'relative', width: roomWidth||360, height: roomHeight||640, border: '1px solid #eee' }}>
         {error && <div style={{ color: 'red' }}>{error}</div>}
-        <RoomMap editable={editMode} tables={tables as any} state={state} width={roomWidth||360} height={roomHeight||640} onTableClick={handleTableClick} onSelectionComplete={handleSelectionComplete} selectionRect={selectionRect} roomWidth={roomWidth} roomHeight={roomHeight} roomId={roomId as string} />
+        <RoomMap editable={editMode} tables={tables as any} state={state} width={roomWidth||360} height={roomHeight||640} onSelectionComplete={handleSelectionComplete} selectionRect={selectionRect} roomWidth={roomWidth} roomHeight={roomHeight} roomId={roomId as string} />
         {editMode && (
           <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
             {!selectionRect ? (

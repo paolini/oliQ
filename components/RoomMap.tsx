@@ -5,7 +5,7 @@ import { State } from '../lib/models/event'
 
 type Table = {
   _id?: string
-  participant_ids?: number[]
+  participant_ids: string[]
   x: number
   y: number
   shape?: 'square' | 'semicircle-left' | 'semicircle-right' | 'circle'
@@ -18,7 +18,6 @@ type Props = {
   state: State
   width?: number
   height?: number
-  onTableClick?: (id?: string) => void
   enableGridInsert?: boolean
   onCreateTables?: (tables: Table[]) => void
   onSelectionComplete?: (rect: { x1: number, y1: number, x2: number, y2: number }) => void
@@ -29,7 +28,7 @@ type Props = {
   roomId: string
 }
 
-export default function RoomMap({ tables, state, width = 360, height = 640, onTableClick, onSelectionComplete, selectionRect: externalRect, roomWidth, roomHeight, editable = true, roomId }: Props) {
+export default function RoomMap({ tables, state, width = 360, height = 640, onSelectionComplete, selectionRect: externalRect, roomWidth, roomHeight, editable = true, roomId }: Props) {
   const padding = 20
   const [selecting, setSelecting] = useState(false)
   const [rect, setRect] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null)
@@ -46,10 +45,6 @@ export default function RoomMap({ tables, state, width = 360, height = 640, onTa
   const viewBox = (typeof roomWidth === 'number' && typeof roomHeight === 'number')
     ? `0 0 ${roomWidth} ${roomHeight}`
     : `${bounds.minX - padding} ${bounds.minY - padding} ${bounds.maxX - bounds.minX + padding * 2} ${bounds.maxY - bounds.minY + padding * 2}`
-
-  const handleClick = (id?: string) => {
-    if (onTableClick) onTableClick(id)
-  }
 
   const handleSeatClick = (participant: string) => {
     // open picker only when NOT in editable (editMode=false => view mode)
@@ -138,7 +133,7 @@ export default function RoomMap({ tables, state, width = 360, height = 640, onTa
       <svg ref={svgRef} width="100%" height="100%" viewBox={viewBox} preserveAspectRatio="none" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
         <rect x={0} y={0} width={roomWidth || (bounds.maxX - bounds.minX + padding * 2)} height={roomHeight || (bounds.maxY - bounds.minY + padding * 2)} fill="#fafafa" />
         {tables.map(t => {
-          return <TablePrimitive key={t._id || `${t.x}-${t.y}`} _id={t._id} participant_states={(t.participant_ids || []).map(id => (participantStatus[`${id}`] || {id, state:'', position: 0}))} x={t.x} y={t.y} shape={t.shape || 'square'} rotation={t.rotation || 0} onClick={handleClick} editable={editable} onSeatClick={handleSeatClick} />
+          return <TablePrimitive key={t._id || `${t.x}-${t.y}`} _id={t._id} participant_states={(t.participant_ids || []).map(id => (participantStatus[id] || {id, state:'', position: 0}))} x={t.x} y={t.y} shape={t.shape || 'square'} rotation={t.rotation || 0} editable={editable} onSeatClick={handleSeatClick} />
         })}
         {renderSelectionRect()}
       </svg>

@@ -29,7 +29,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse<Data>) {
       const payload = req.body
       if (!Array.isArray(payload)) return res.status(400).json({ ok: false, error: 'expected an array of tables' })
       if (payload.length > 0) {
-        const valid = payload.every((t:any) => typeof t.x === 'number' && typeof t.y === 'number' && (t.shape === 'square' || t.shape === 'circle') && Array.isArray(t.participant_ids))
+        const valid = payload.every((t:any) => typeof t.x === 'number' 
+          && typeof t.y === 'number' 
+          && (t.shape === 'square' || t.shape === 'circle') 
+          && Array.isArray(t.participant_ids)
+          && t.participant_ids.every((pid:any) => typeof pid === 'string')
+        )
         if (!valid) return res.status(400).json({ ok: false, error: 'invalid table format' })
       }
 

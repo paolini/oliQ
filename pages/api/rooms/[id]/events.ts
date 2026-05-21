@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const body = req.body || {}
     if (typeof body.state !== 'string') return res.status(400).json({ error: 'state is required' });
     const state = body.state as string;
-    if (typeof body.participant !== 'string') return res.status(400).json({ error: 'participant_id is required' });    
+    if (typeof body.participant !== 'string') return res.status(400).json({ error: 'participant is required' });    
     const participant = body.participant as string
      
     const client = await getMongoClient()
