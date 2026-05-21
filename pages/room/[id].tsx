@@ -42,15 +42,15 @@ export default function RoomPage() {
       es = new EventSource(`/api/rooms/${roomId}/subscribe`)
 
       es.addEventListener('message', (ev) => {
-        try { 
-          const msg = JSON.parse(ev.data); 
-          if (msg && (msg.type === 'tables:replace' || msg.type === 'tables:update')) { 
-            reloadTables() } 
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg && (msg.type === 'tables:replace' || msg.type === 'tables:update')) { reloadTables() }
           if (msg && msg.type === 'state:change') {
-            updateState(msg.state) // update local state cache with new state from server
+            const incoming = msg.state
+            if (incoming) updateState(incoming)
           }
-        } catch (e) { 
-            reloadTables() 
+        } catch (e) {
+          reloadTables()
         }
       })
     } catch (e) {
@@ -106,6 +106,11 @@ export default function RoomPage() {
     // update local state with new state from server
     // for simplicity, we just log it here; in a real app you'd want to merge it into your UI state
     console.log('Received new room state from server:', state)
+    try {
+      setState(state)
+    } catch (e) {
+      console.error('Failed to apply incoming state to UI:', e)
+    }
   }
 
   const reloadTables = async () => {
@@ -239,8 +244,6 @@ export default function RoomPage() {
           <div style={{ fontSize: 13 }}>{editMode ? 'Edit mode' : 'View mode'}</div>
         </div>
       </div>
-
-      {JSON.stringify({state})}
 
       {/* simplified view portion */}
       <div style={{ position: 'relative', width: roomWidth||360, height: roomHeight||640, border: '1px solid #eee' }}>

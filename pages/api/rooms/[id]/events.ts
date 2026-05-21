@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const eventWithId = { ...event, _id: result.insertedId }
 
     const room_state = await getUpdatedState(db, room_id, eventWithId);
-    await redis.publish(`room:${room_id}`, JSON.stringify({type: "state:change", room_state})) 
+    await redis.publish(`room:${room_id}`, JSON.stringify({type: "state:change", state: room_state})) 
     return res.status(201).json({ ok: true, state: room_state })
   }
 
